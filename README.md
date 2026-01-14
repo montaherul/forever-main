@@ -75,8 +75,8 @@ For detailed UI/UX design specifications, wireframes, component maps, and implem
 
 - **Frontend**: React, Redux, React Router
 - **Backend**: Node.js, Express, MongoDB
-- **Authentication**: JWT
-- **Payment**: Stripe, Razorpay
+- **Authentication**: JWT,Firebase
+- **Payment**: bkash,nogod
 - **Image Uploads**: Cloudinary, Multer
 - **Deployment**: Vercel
 
