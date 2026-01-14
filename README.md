@@ -41,7 +41,7 @@ For detailed UI/UX design specifications, wireframes, component maps, and implem
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/mern-ecommerce.git
+   git clone https://github.com/montaherul/forever-main.git
    ```
 2. Navigate to the project directory:
    ```bash
