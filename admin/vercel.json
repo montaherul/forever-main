@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "env": {
-    "VITE_BACKEND_URL": "@vite_backend_url"
+    "VITE_BACKEND_URL": "http://localhost:4000"
   },
   "rewrites": [
     {
