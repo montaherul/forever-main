@@ -32,8 +32,8 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // CORS Configuration
 const corsOptions = {
   origin: [
-    "https://forever-main-f.vercel.app/",
-    "https://forever-main-admin-p.vercel.app/",
+    "https://forever-main-f.vercel.app",
+    "https://forever-main-admin-p.vercel.app",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:3000",
