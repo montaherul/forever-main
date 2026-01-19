@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { assets } from "../assets/assets";
 import axios from "axios";
-import { backendUrl } from "../App";
+import { backendUrl, AdminContext } from "../App";
 import { toast } from "react-toastify";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -9,7 +9,8 @@ import {
   getSizesBySubcategory,
 } from "../config/sizeConfig.js";
 
-const Add = ({ token }) => {
+const Add = () => {
+  const { token } = useContext(AdminContext);
   const [image1, setImage1] = useState(false);
   const [image2, setImage2] = useState(false);
   const [image3, setImage3] = useState(false);
@@ -31,11 +32,9 @@ const Add = ({ token }) => {
   const [specsText, setSpecsText] = useState(""); // key:value per line or JSON
   const [sku, setSku] = useState("");
   const [tags, setTags] = useState("");
-  const [weight, setWeight] = useState("");
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [depth, setDepth] = useState("");
-  const [stockQuantity, setStockQuantity] = useState(0);
 
   // Edit mode support
   const location = useLocation();
@@ -65,11 +64,9 @@ const Add = ({ token }) => {
       setWarranty(product.warranty || "");
       setSku(product.sku || "");
       setTags((product.tags || []).join(", "));
-      setWeight(product.weight || "");
       setWidth(product.dimensions?.width || "");
       setHeight(product.dimensions?.height || "");
       setDepth(product.dimensions?.depth || "");
-      setStockQuantity(product.stockQuantity ?? 0);
       if (product.specs) {
         const lines = Object.entries(product.specs || {})
           .map(([k, v]) => `${k}: ${v}`)
@@ -96,13 +93,10 @@ const Add = ({ token }) => {
       formData.append("sizeStock", JSON.stringify(sizeStock));
       if (sku) formData.append("sku", sku);
       if (tags) formData.append("tags", tags);
-      if (weight) formData.append("weight", weight);
       if (width) formData.append("width", width);
       if (height) formData.append("height", height);
       if (depth) formData.append("depth", depth);
-      formData.append("stockQuantity", stockQuantity || 0);
       if (brand) formData.append("brand", brand);
-      if (model) formData.append("model", model);
       if (warranty) formData.append("warranty", warranty);
       if (specsText) formData.append("specs", specsText);
 
@@ -138,11 +132,9 @@ const Add = ({ token }) => {
           setBestseller(false);
           setSku("");
           setTags("");
-          setWeight("");
           setWidth("");
           setHeight("");
           setDepth("");
-          setStockQuantity(0);
         }
       } else {
         toast.error(response.data.message);
@@ -428,36 +420,8 @@ const Add = ({ token }) => {
         </div>
       </div>
 
-      {/* Inventory & Physical Details */}
-      <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            📦 Stock Quantity
-          </label>
-          <input
-            value={stockQuantity}
-            onChange={(e) =>
-              setStockQuantity(Math.max(0, Number(e.target.value) || 0))
-            }
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-600 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all"
-            type="number"
-            min="0"
-            step="1"
-            placeholder="e.g., 50"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            ⚖️ Weight (optional)
-          </label>
-          <input
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-600 focus:ring-2 focus:ring-green-200 focus:outline-none transition-all"
-            type="text"
-            placeholder="e.g., 1.2kg"
-          />
-        </div>
+      {/* Physical Details */}
+      <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             📐 Dimensions (optional)
