@@ -84,7 +84,7 @@ const addProduct = async (req, res) => {
       const image4 = req.files.image4?.[0];
 
       const images = [image1, image2, image3, image4].filter(
-        (item) => item !== undefined
+        (item) => item !== undefined,
       );
 
       // ✅ Convert images to base64 if any were uploaded
@@ -111,10 +111,16 @@ const addProduct = async (req, res) => {
     // ✅ Create product data object
     const parsedDiscount = Math.max(
       0,
-      Math.min(100, Number.isNaN(Number(discount)) ? 0 : Number(discount))
+      Math.min(100, Number.isNaN(Number(discount)) ? 0 : Number(discount)),
     );
 
-    const parsedSizes = JSON.parse(sizes);
+    let parsedSizes = [];
+    try {
+      parsedSizes = JSON.parse(sizes);
+    } catch (err) {
+      console.warn("sizes parse error", err);
+      parsedSizes = [];
+    }
 
     const productData = {
       name,
@@ -167,7 +173,7 @@ const addProduct = async (req, res) => {
           // derive stockQuantity if not provided
           const total = Object.values(parsed).reduce(
             (acc, val) => acc + (Number(val) || 0),
-            0
+            0,
           );
           if (productData.stockQuantity === undefined) {
             productData.stockQuantity = total;
@@ -179,25 +185,44 @@ const addProduct = async (req, res) => {
       }
     }
 
+    // ✅ Save product in DB FIRST
+    const product = new productModel(productData);
+    await product.save();
+
+    // Validate product was saved with valid _id
+    if (!product._id) {
+      throw new Error("Product save failed - no _id generated");
+    }
+
     // NEW: Create separate pricing record if sizePricing provided
     let pricingId = null;
-    if (sizePricing) {
+    if (sizePricing && sizePricing !== "{}") {
       try {
         const parsed = JSON.parse(sizePricing);
-        if (parsed && typeof parsed === "object") {
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          Object.keys(parsed).length > 0
+        ) {
           // Build sizes array from sizePricing
-          const parsedSizes = JSON.parse(sizes);
           const sizesArray = parsedSizes.map((size) => ({
             size,
-            price: parsed[size] || Number(price),
+            price: parsed[size] ? Number(parsed[size]) : Number(price),
           }));
 
           // Find base price (lowest)
           const basePrice = Math.min(...sizesArray.map((s) => s.price));
 
-          // Create pricing record
+          // CRITICAL: Verify product._id exists
+          if (!product || !product._id) {
+            throw new Error(
+              `Cannot create pricing: product._id is ${product?._id}. Product save may have failed.`,
+            );
+          }
+
+          // Create pricing record WITH productId
           const pricingData = {
-            productId: null, // Will be set after product is created
+            productId: product._id,
             basePrice,
             sizes: sizesArray,
             updatedBy: req.headers.admin || "system",
@@ -206,15 +231,34 @@ const addProduct = async (req, res) => {
           const pricingRecord = new pricingModel(pricingData);
           const savedPricing = await pricingRecord.save();
           pricingId = savedPricing._id;
+
+          // Update product with pricingId
+          const updatedProduct = await productModel.findByIdAndUpdate(
+            product._id,
+            { pricingId: pricingId },
+            { new: true },
+          );
         }
       } catch (error) {
-        console.log("Size pricing parsing error:", error);
+        console.error("❌ Size pricing creation error:", error.message);
+        console.error("Error details:", {
+          productId: product?._id,
+          hasProduct: !!product,
+          errorType: error.name,
+        });
       }
     }
 
     // NEW: Auto-create pricing record for products with multiple sizes (no custom pricing)
     if (!pricingId && parsedSizes.length > 1) {
       try {
+        // CRITICAL: Verify product._id exists
+        if (!product || !product._id) {
+          throw new Error(
+            `Cannot create auto-pricing: product._id is ${product?._id}. Product save may have failed.`,
+          );
+        }
+
         // Create equal pricing for all sizes using base price
         const sizesArray = parsedSizes.map((size) => ({
           size,
@@ -224,7 +268,7 @@ const addProduct = async (req, res) => {
         const basePrice = Number(price);
 
         const pricingData = {
-          productId: null, // Will be set after product is created
+          productId: product._id,
           basePrice,
           sizes: sizesArray,
           updatedBy: req.headers.admin || "system",
@@ -233,19 +277,20 @@ const addProduct = async (req, res) => {
         const pricingRecord = new pricingModel(pricingData);
         const savedPricing = await pricingRecord.save();
         pricingId = savedPricing._id;
+
+        // Update product with pricingId
+        await productModel.findByIdAndUpdate(product._id, {
+          pricingId: pricingId,
+        });
       } catch (error) {
-        console.log("Auto-pricing creation error:", error);
+        console.error("❌ Auto-pricing creation error:", error.message);
+        console.error("Error details:", {
+          productId: product?._id,
+          hasProduct: !!product,
+          errorType: error.name,
+        });
       }
     }
-
-    // Add pricingId to product data
-    if (pricingId) {
-      productData.pricingId = pricingId;
-    }
-
-    // ✅ Save product in DB
-    const product = new productModel(productData);
-    await product.save();
 
     // ✅ Sync to JSON file
     await syncProductsToJSON();
@@ -261,7 +306,6 @@ const addProduct = async (req, res) => {
       productId: product._id,
     });
   } catch (error) {
-    console.log("Error in addProduct:", error);
     res.json({ success: false, message: error.message });
   }
 };
@@ -272,7 +316,6 @@ const listProducts = async (req, res) => {
     const products = await productModel.find({}).populate("pricingId");
     res.json({ success: true, products });
   } catch (error) {
-    console.log(error);
     res.json({ success: false, message: error.message });
   }
 };
@@ -287,7 +330,6 @@ const removeProduct = async (req, res) => {
 
     res.json({ success: true, message: "Product removed" });
   } catch (error) {
-    console.log(error);
     res.json({ success: false, message: error.message });
   }
 };
@@ -331,7 +373,7 @@ const updateProduct = async (req, res) => {
     // Create update data object
     const parsedDiscount = Math.max(
       0,
-      Math.min(100, Number.isNaN(Number(discount)) ? 0 : Number(discount))
+      Math.min(100, Number.isNaN(Number(discount)) ? 0 : Number(discount)),
     );
 
     const parsedSizes = JSON.parse(sizes);
@@ -386,7 +428,7 @@ const updateProduct = async (req, res) => {
           updateData.sizeStock = parsed;
           const total = Object.values(parsed).reduce(
             (acc, val) => acc + (Number(val) || 0),
-            0
+            0,
           );
           updateData.stockQuantity =
             updateData.stockQuantity !== undefined
@@ -433,7 +475,12 @@ const updateProduct = async (req, res) => {
           }
         }
       } catch (error) {
-        console.log("Size pricing parsing error:", error);
+        console.error("❌ Size pricing parsing error:", error.message);
+        console.error("Error details:", {
+          productId: id,
+          hasExistingProduct: !!existingProduct,
+          errorType: error.name,
+        });
       }
     }
 
@@ -468,7 +515,12 @@ const updateProduct = async (req, res) => {
           updateData.pricingId = savedPricing._id;
         }
       } catch (error) {
-        console.log("Auto-pricing update error:", error);
+        console.error("❌ Auto-pricing update error:", error.message);
+        console.error("Error details:", {
+          productId: id,
+          hasExistingProduct: !!existingProduct,
+          errorType: error.name,
+        });
       }
     }
 
@@ -503,10 +555,10 @@ const updateProduct = async (req, res) => {
           } catch (error) {
             console.error(
               `Error processing image ${uploadedImage.filename}:`,
-              error
+              error,
             );
             throw new Error(
-              `Failed to process image: ${uploadedImage.filename}`
+              `Failed to process image: ${uploadedImage.filename}`,
             );
           }
         }
@@ -543,13 +595,10 @@ const singleProduct = async (req, res) => {
       .populate("pricingId");
     res.json({ success: true, product });
   } catch (error) {
-    console.log(error);
     res.json({ success: false, message: error.message });
   }
 };
 // GET all products
-
-
 
 export {
   addProduct,
