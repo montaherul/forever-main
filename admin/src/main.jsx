@@ -8,7 +8,7 @@ import List from "./pages/List.jsx";
 import Orders from "./pages/Orders.jsx";
 import Coupons from "./pages/Coupons.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
-import Users from "./pages/users.jsx";
+import Users from "./pages/Users.jsx";
 import AdminProductReviews from "./pages/AdminProductReviews.jsx";
 
 const router = createBrowserRouter([
